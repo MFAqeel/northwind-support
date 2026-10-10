@@ -1,3 +1,4 @@
+
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ticketsApi } from '../../../api/tickets';
@@ -36,7 +37,6 @@ describe('useTicketList', () => {
       result.current.updateFilters({ search: 'invoice' });
     });
 
-    // Still inside the debounce window: no second request yet.
     expect(getTickets).toHaveBeenCalledTimes(1);
 
     await act(async () => {
@@ -50,5 +50,28 @@ describe('useTicketList', () => {
 
     expect(result.current.isLoading).toBe(false);
     expect(result.current.data?.items).toHaveLength(1);
+  });
+
+  it('requests tickets immediately when the status filter changes', async () => {
+    const { result } = renderHook(() => useTicketList());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(getTickets).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      result.current.updateFilters({ status: 'InProgress' });
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(getTickets).toHaveBeenCalledTimes(2);
+    expect(getTickets).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: 'InProgress' }),
+    );
   });
 });
