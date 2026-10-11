@@ -7,6 +7,7 @@ using SupportDesk.Infrastructure.Data;
 using SupportDesk.Infrastructure.Queries;
 using SupportDesk.Infrastructure.Repositories;
 using SupportDesk.Infrastructure.Services;
+using SupportDesk.Application.Services;
 
 namespace SupportDesk.Infrastructure;
 
@@ -15,6 +16,7 @@ namespace SupportDesk.Infrastructure;
 /// system implementations.
 /// </summary>
 public static class DependencyInjection
+
 {
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
@@ -37,11 +39,60 @@ public static class DependencyInjection
         services.AddScoped<ICategoryRepository, CategoryRepository>();
 
         services.AddScoped<ITicketQueries, TicketQueries>();
+        services.AddScoped<TicketEscalationQueries>();
         services.AddScoped<ICustomerQueries, CustomerQueries>();
         services.AddScoped<IAgentQueries, AgentQueries>();
         services.AddScoped<ICategoryQueries, CategoryQueries>();
 
+        services.AddSingleton<PasswordService>();
         services.AddScoped<SupportDbSeeder>();
+
+        // Register configurable SLA settings
+
+services.Configure<SlaOptions>(options =>
+{
+    var section = configuration.GetSection(SlaOptions.SectionName);
+
+    foreach (var priority in options.BaseWindowHours.Keys.ToList())
+    {
+        if (double.TryParse(
+            section[$"BaseWindowHours:{priority}"],
+            System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var hours))
+        {
+            options.BaseWindowHours[priority] = hours;
+        }
+    }
+
+    if (double.TryParse(
+        section["PremiumCustomerMultiplier"],
+        System.Globalization.NumberStyles.Float,
+        System.Globalization.CultureInfo.InvariantCulture,
+        out var multiplier))
+    {
+        options.PremiumCustomerMultiplier = multiplier;
+    }
+
+    if (double.TryParse(
+        section["MinimumWindowHours"],
+        System.Globalization.NumberStyles.Float,
+        System.Globalization.CultureInfo.InvariantCulture,
+        out var minimumHours))
+    {
+        options.MinimumWindowHours = minimumHours;
+    }
+
+    if (double.TryParse(
+        section["AtRiskThresholdPercent"],
+        System.Globalization.NumberStyles.Float,
+        System.Globalization.CultureInfo.InvariantCulture,
+        out var threshold))
+    {
+        options.AtRiskThresholdPercent = threshold;
+    }
+});
+
 
         return services;
     }

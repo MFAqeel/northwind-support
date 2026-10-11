@@ -1,4 +1,8 @@
 using System.Text.Json.Serialization;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.IdentityModel.Tokens;
 using SupportDesk.Application;
 using SupportDesk.Infrastructure;
 using SupportDesk.Presentation.Extensions;
@@ -27,6 +31,21 @@ builder.Services.AddCors(options => options.AddPolicy(
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey) || Encoding.UTF8.GetByteCount(jwtKey) < 32)
+    throw new InvalidOperationException("Configure Jwt:Key with at least 32 bytes via environment variables.");
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options => options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+        ValidateIssuer = true, ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "NorthwindSupport",
+        ValidateAudience = true, ValidAudience = builder.Configuration["Jwt:Audience"] ?? "NorthwindSupportWeb",
+        ValidateLifetime = true, ClockSkew = TimeSpan.FromSeconds(30)
+    });
+builder.Services.AddAuthorization(options => options.FallbackPolicy =
+    new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+builder.Services.AddHealthChecks().AddDbContextCheck<SupportDesk.Infrastructure.Data.SupportDbContext>();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -39,11 +58,14 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 
-    // Keeps a developer machine one command away from a working database.
-    await app.MigrateAndSeedAsync();
 }
 
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Database:InitializeOnStartup"))
+    await app.MigrateAndSeedAsync();
 app.UseCors(FrontendCorsPolicy);
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapHealthChecks("/health").AllowAnonymous();
 
 app.MapControllers();
 

@@ -8,6 +8,7 @@ namespace SupportDesk.Domain.Repositories;
 /// </summary>
 public interface ITicketRepository
 {
+    Task AddEscalationAsync(TicketEscalation escalation, CancellationToken ct);
     /// <summary>Loads a tracked ticket for modification, or null when it does not exist.</summary>
     Task<Ticket?> GetByIdAsync(int id, CancellationToken ct);
 

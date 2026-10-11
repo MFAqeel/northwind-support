@@ -1,5 +1,7 @@
+
 using SupportDesk.Application.Contracts.Tickets;
 using SupportDesk.Application.Exceptions;
+using SupportDesk.Domain.Aggregates.Customers;
 using SupportDesk.Domain.Aggregates.Tickets;
 using SupportDesk.UnitTests.TestDoubles;
 
@@ -42,9 +44,12 @@ public class RaiseTicketCommandHandlerTests
     public async Task HandleAsync_WhenCustomerDoesNotExist_Throws()
     {
         var context = new TicketCommandTestContext();
+
         context.Customers
-            .Setup(c => c.ExistsAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
+            .Setup(c => c.GetByIdAsync(
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Customer?)null);
 
         var exception = await Assert.ThrowsAsync<NotFoundException>(
             () => context.RaiseTicket.HandleAsync(Request(), CancellationToken.None));

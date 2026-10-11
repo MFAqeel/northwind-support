@@ -9,21 +9,61 @@ public class SlaEvaluatorTests
 
     [Fact]
     public void Evaluate_WithoutADueDate_IsNotApplicable() =>
-        Assert.Equal(SlaStatus.NotApplicable, SlaEvaluator.Evaluate(null, null, Now));
+        Assert.Equal(
+            SlaStatus.NotApplicable,
+            SlaEvaluator.Evaluate(null, null, Now));
 
     [Fact]
     public void Evaluate_ResolvedOnTime_IsMet() =>
-        Assert.Equal(SlaStatus.Met, SlaEvaluator.Evaluate(Now, Now, Now.AddDays(1)));
+        Assert.Equal(
+            SlaStatus.Met,
+            SlaEvaluator.Evaluate(Now, Now, Now.AddDays(1)));
 
     [Fact]
     public void Evaluate_ResolvedLate_IsBreached() =>
-        Assert.Equal(SlaStatus.Breached, SlaEvaluator.Evaluate(Now, Now.AddMinutes(1), Now));
+        Assert.Equal(
+            SlaStatus.Breached,
+            SlaEvaluator.Evaluate(Now, Now.AddMinutes(1), Now));
 
     [Fact]
     public void Evaluate_OpenAndPastDue_IsBreached() =>
-        Assert.Equal(SlaStatus.Breached, SlaEvaluator.Evaluate(Now.AddMinutes(-1), null, Now));
+        Assert.Equal(
+            SlaStatus.Breached,
+            SlaEvaluator.Evaluate(Now.AddMinutes(-1), null, Now));
 
     [Fact]
     public void Evaluate_OpenAndBeforeDue_IsWithinSla() =>
-        Assert.Equal(SlaStatus.WithinSla, SlaEvaluator.Evaluate(Now.AddHours(1), null, Now));
+        Assert.Equal(
+            SlaStatus.WithinSla,
+            SlaEvaluator.Evaluate(Now.AddHours(1), null, Now));
+
+    [Fact]
+    public void Evaluate_OpenTicketWith25PercentRemaining_IsAtRisk()
+    {
+        var dueAt = Now.AddHours(4);
+
+        var result = SlaEvaluator.Evaluate(
+            dueAt,
+            null,
+            Now,
+            atRiskThresholdPercent: 25,
+            originalWindow: TimeSpan.FromHours(16));
+
+        Assert.Equal(SlaStatus.AtRisk, result);
+    }
+
+    [Fact]
+    public void Evaluate_OpenTicketWithMoreThan25PercentRemaining_IsWithinSla()
+    {
+        var dueAt = Now.AddHours(8);
+
+        var result = SlaEvaluator.Evaluate(
+            dueAt,
+            null,
+            Now,
+            atRiskThresholdPercent: 25,
+            originalWindow: TimeSpan.FromHours(16));
+
+        Assert.Equal(SlaStatus.WithinSla, result);
+    }
 }

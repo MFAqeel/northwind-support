@@ -1,4 +1,5 @@
 import type { ProblemDetails } from '../types/api';
+import { clearSession, getSession } from './session';
 
 /**
  * Where the API lives. In development this stays '/api' and the Vite dev server proxies it
@@ -34,10 +35,18 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: {
       'Content-Type': 'application/json',
+      ...(getSession()?.token ? { Authorization: `Bearer ${getSession()!.token}` } : {}),
       ...(init?.headers ?? {}),
     },
   });
 
+  if (response.status === 401 && !path.startsWith('/auth/login')) {
+    clearSession();
+    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+      const next = window.location.pathname + window.location.search;
+      window.location.assign(`/login?next=${encodeURIComponent(next)}`);
+    }
+  }
   if (!response.ok) {
     const problem = await readProblem(response);
 

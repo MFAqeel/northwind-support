@@ -11,6 +11,9 @@ namespace SupportDesk.Infrastructure.Repositories;
 /// </summary>
 public sealed class TicketRepository(SupportDbContext db) : ITicketRepository
 {
+    public async Task AddEscalationAsync(TicketEscalation escalation, CancellationToken ct) =>
+        await db.Set<TicketEscalation>().AddAsync(escalation, ct);
+
     public Task<Ticket?> GetByIdAsync(int id, CancellationToken ct) =>
         db.Set<Ticket>().FirstOrDefaultAsync(t => t.Id == id, ct);
 

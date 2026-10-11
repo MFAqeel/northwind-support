@@ -31,6 +31,10 @@ public sealed class Agent : AggregateRoot
 
     public string Email { get; private set; } = string.Empty;
 
+    public string? PasswordHash { get; private set; }
+
+    public void SetPasswordHash(string hash) => PasswordHash = !string.IsNullOrWhiteSpace(hash) ? hash : throw new ArgumentException("Hash is required.");
+
     /// <summary>Inactive agents keep their history but take no new work.</summary>
     public bool IsActive { get; private set; }
 

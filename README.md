@@ -107,3 +107,28 @@ and 40 tickets across every status, priority and SLA state.
 | Browser warns about the certificate | `dotnet dev-certs https --trust`, or use the web app, which proxies |
 | Web app shows "Unable to load tickets" | The API is not running, or `VITE_API_PROXY_TARGET` points at the wrong port |
 | SQL Server slow on Apple Silicon | Enable Rosetta in Docker Desktop → Settings → General |
+
+## Task 2 additions (review before submission)
+
+Ticket creation uses category flags for forced priority and specialization, and configured SLA windows with a premium multiplier and floor. Assignment selects the least-loaded active qualified agent below capacity, using agent ID to break ties. If no eligible agent exists, creation still succeeds and returns a triage explanation. Escalation records before/after priority, agent, deadline, actor and reason. The SLA start timestamp is persisted so that the at-risk threshold remains correct after an escalation resets the window. SLA status is computed, not stored, and list filtering is performed in SQL before count and pagination.
+
+The `TicketEscalations` composite index on `(TicketId, EscalatedAtUtc)` supports history retrieval in newest-first order. The escalation history table uses a restricted ticket FK to prevent deleting audit records by cascading. The migration includes an initial SLA-start backfill for existing tickets with due dates.
+
+**Verification required:** Run `dotnet test` and `npm run test --workspace apps/web`, apply the migration to a local SQL Server instance, and check ticket creation, escalation, and all SLA filter values. This uploaded-file editing environment did not have a .NET SDK or an available npm package install, so these changes have **not** been build-tested here. The pre-existing EF model snapshot should be regenerated/checked with `dotnet ef migrations` before further schema migrations. Manual assignment is separate from automatic triage; simultaneous ticket creation can race on capacity and reference numbering, so a production implementation would add concurrency safeguards.
+
+
+## Candidate implementation — Tasks 1–4
+
+Task 1: UI status filter refresh and SQL-side filtering. Task 2: category-aware priority, premium SLA windows, capacity-aware assignment, escalation history and SLA state in the UI. Task 3: agent login and JWT-protected API. Task 4: API Docker image and Compose service.
+
+### Development login
+Use **alex.turner@northwind-support.example** / **LocalDemo!2026** (development fixture only). Other active seeded agents use the same fixture password; the inactive Yuki account cannot log in. Existing development databases receive hashed credentials at startup after migration.
+
+### Local run
+Set `Jwt__Key` to a random 32+ byte key in your shell (or load `.env` into the environment); `.env.example` is a local-only illustration. Start SQL Server, then `dotnet run --project apps/api/src/SupportDesk.Presentation`, and `npm run web`. Sign in at `/login`. JWTs expire after two hours; they are kept in `sessionStorage` and attached as bearer tokens. A 401 clears the session and redirects to login. `sessionStorage` is tab-scoped, but a script injected through XSS could read it; production should add a CSP and security review. Passwords are PBKDF2-HMAC-SHA256 with random salts and 210,000 iterations.
+
+### Docker run
+Copy `.env.example` to `.env`, replace `JWT_KEY` with a unique 32+ byte value, and run `docker compose up --build`. API: `http://localhost:5080`; health: `http://localhost:5080/health`. Run the web app with `VITE_API_PROXY_TARGET=http://localhost:5080 npm run web` (PowerShell: `$env:VITE_API_PROXY_TARGET='http://localhost:5080'; npm run web`). The API runs as a non-root user, migrates and seeds only when explicitly enabled in Compose, and obtains database and JWT settings from environment variables. Production migrations should run separately under deployment control, not on every app startup. Verify `docker compose exec api whoami`, `docker compose down -v && docker compose up --build`, image sizes (`docker images`), and Docker restore-layer cache on your machine; these results have not been measured here.
+
+### Known limitations and verification
+No refresh tokens, password reset, roles, MFA, lockout, rate limiting or production secret management. Run `dotnet test`, `npm test`, `npm run build`, and exercise login, 401, escalation, filtering and `/health` against SQL Server before submission. AI-assisted implementation requires a manual code review; see `APPROACH.md`.
